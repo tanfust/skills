@@ -1,6 +1,6 @@
 ---
 name: tanfust-skills
-description: Index and router for the Tanfust skills pack, production procedures for Supabase multi-tenancy and RLS and Supabase auth email templates. Use this whenever the work involves Supabase, Postgres row level security, organizations or tenants, memberships and invites, org_id or tenant_id columns, Supabase Auth emails, confirmation or magic link or recovery emails, or config.toml email settings, so the specific skill gets loaded instead of guessing from first principles. Load it even when the request sounds small, because the failures in this territory are silent.
+description: Index and router for the Tanfust skills pack, production procedures for Supabase multi-tenancy and RLS, Supabase auth email templates, and Paddle domain verification. Use this whenever the work involves Supabase, Postgres row level security, organizations or tenants, memberships and invites, org_id or tenant_id columns, Supabase Auth emails, confirmation or magic link or recovery emails, config.toml email settings, Paddle website approval or domain review, refund policy or terms pages for a site selling through Paddle, so the specific skill gets loaded instead of guessing from first principles. Load it even when the request sounds small, because the failures in this territory are silent or cost a week.
 ---
 
 # Tanfust skills
@@ -13,8 +13,9 @@ Procedures extracted from production work, not summaries of documentation. Each 
 | --- | --- |
 | Organizations, teams, workspaces, tenants, memberships, invites, roles, `org_id`, RLS policies, security definer helpers, tenant isolation audits | `supabase-multi-tenant-rls` |
 | Supabase Auth email templates, confirmation and magic link and recovery emails, React Email, `config.toml` email config, SMTP setup, emails landing in spam | `supabase-auth-emails` |
+| Paddle website approval or domain verification, a domain review rejection, refund policy, terms and conditions or privacy policy for a site that sells through Paddle, Merchant of Record wording, paddle.net | `paddle-domain-verification` |
 
-Not yet in the pack, so do not try to load them: `paddle-webhooks`, `revenuecat-supabase-entitlements`, `agent-readable-site`. Until they ship, work from the vendor docs and the shared conventions below.
+Not yet in the pack, so do not try to load them: `paddle-webhooks`, `revenuecat-supabase-entitlements`, `agent-readable-site`. Paddle checkout code, webhooks and fulfilment are outside `paddle-domain-verification`. Until they ship, work from the vendor docs and the shared conventions below.
 
 If more than one applies, load them all. They are written to compose: the RLS skill defines the tenant boundary, and the auth email skill sits on the same `supabase/config.toml`.
 

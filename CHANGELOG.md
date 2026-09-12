@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-12
+
+### Added
+
+- `paddle-domain-verification`: getting a domain through Paddle's website approval. Rewritten from an internal legal-page generator into a procedure: facts that must match the Paddle account, the handbook's verbatim Merchant of Record sentence, an unconditional refund window, `references/REQUIREMENTS.md` quoting Paddle's pages with URLs and read dates, placeholder templates, and a curl-based check against the live pages plus the dashboard status as the pass condition.
+
 ## [0.1.0] - 2026-09-12
 
 ### Added
@@ -17,5 +23,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - `scripts/validate.py` structural validator and a GitHub Actions workflow that runs it on push and pull request.
 - `skills-framework.md`, the admission standard, plus `CONTRIBUTING.md` and `SECURITY.md`.
 
-[Unreleased]: https://github.com/tanfust/skills/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tanfust/skills/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/tanfust/skills/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tanfust/skills/releases/tag/v0.1.0

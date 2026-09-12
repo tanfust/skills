@@ -10,7 +10,7 @@
         {
             "name": "tanfust-skills",
             "source": "./",
-            "description": "Production procedures for Supabase multi-tenancy and RLS and Supabase auth emails, extracted from shipped work. Each skill ends in a verification step.",
+            "description": "Production procedures for Supabase multi-tenancy and RLS, Supabase auth emails, and Paddle domain verification, extracted from shipped work. Each skill ends in a verification step.",
             "category": "development",
             "author": {
                 "name": "Wassim Benromdhane",

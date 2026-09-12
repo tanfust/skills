@@ -32,6 +32,7 @@ Copy the skill directory into `~/.claude/skills/` or your agent's equivalent.
 | --- | --- |
 | [`supabase-multi-tenant-rls`](skills/supabase-multi-tenant-rls) | Organizations, memberships, roles and invites. Non-recursive policies, security definer helpers that cannot be shadowed, the UPDATE `with check` trap, and a cross-tenant proof that either passes or names the leak. |
 | [`supabase-auth-emails`](skills/supabase-auth-emails) | Branded React Email templates for confirmation, magic link, recovery, invite and email change. The `token_hash` link flow that survives being opened on another device, custom SMTP so customers actually receive mail, `supabase config push` so production stops sending the default, and a verification that reads the sent message back out of Mailpit. |
+| [`paddle-domain-verification`](skills/paddle-domain-verification) | Getting a domain through Paddle's website approval, or fixing a rejection. The facts that must match the Paddle account, the verbatim Merchant of Record sentence, a refund window with nothing attached to it, sourced requirements with URLs, templates with placeholders, and a curl check that runs against the live pages before you submit. |
 | [`tanfust-skills`](skills/tanfust-skills) | Index and routing for the pack. |
 
 Shipping next, in order:
