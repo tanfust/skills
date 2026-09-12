@@ -33,15 +33,12 @@ Copy the skill directory into `~/.claude/skills/` or your agent's equivalent.
 | [`supabase-multi-tenant-rls`](skills/supabase-multi-tenant-rls) | Organizations, memberships, roles and invites. Non-recursive policies, security definer helpers that cannot be shadowed, the UPDATE `with check` trap, and a cross-tenant proof that either passes or names the leak. |
 | [`supabase-auth-emails`](skills/supabase-auth-emails) | Branded React Email templates for confirmation, magic link, recovery, invite and email change. The `token_hash` link flow that survives being opened on another device, custom SMTP so customers actually receive mail, `supabase config push` so production stops sending the default, and a verification that reads the sent message back out of Mailpit. |
 | [`paddle-domain-verification`](skills/paddle-domain-verification) | Getting a domain through Paddle's website approval, or fixing a rejection. The facts that must match the Paddle account, the verbatim Merchant of Record sentence, a refund window with nothing attached to it, sourced requirements with URLs, templates with placeholders, and a curl check that runs against the live pages before you submit. |
+| [`paddle-webhooks`](skills/paddle-webhooks) | Fulfilling one-time digital purchases from Paddle Billing into Supabase. Signature on the raw body, an `event_id` ledger, licences keyed on (transaction, product), refund and chargeback revocation by adjustment action and status with an `occurred_at` guard, and a verification that replays the simulator and reads the ledger. |
+| [`revenuecat-supabase-entitlements`](skills/revenuecat-supabase-entitlements) | Syncing RevenueCat subscriptions into an `entitlements` table that RLS can read. An Edge Function that authenticates the shared header, dedupes on event id, then fetches the subscriber and writes expiry-based truth instead of trusting the event type; sandbox kept out of production; the paywall states; a drift query. |
+| [`agent-readable-site`](skills/agent-readable-site) | Making a marketing site legible to agents. A generated `llms.txt`, a markdown mirror with negotiation that never catches browsers, Content-Signal in `robots.txt`, `Link` headers, 404s in the client's format, an optional MCP card, and a script that asserts the whole contract against the deployed host. |
 | [`tanfust-skills`](skills/tanfust-skills) | Index and routing for the pack. |
 
-Shipping next, in order:
-
-- `paddle-webhooks`: signature verification, idempotency ledger, out-of-order delivery, license issuance, refund and dispute revocation
-- `revenuecat-supabase-entitlements`: webhook to entitlement sync, the states a paywall actually has to handle
-- `agent-readable-site`: llms.txt, markdown mirrors, an MCP server on a marketing site, Content-Signal
-
-`supabase-auth-emails` used to live at [tanfust/supabase-auth-emails](https://github.com/tanfust/supabase-auth-emails). That repo now redirects here; its history was merged into this one.
+`supabase-auth-emails` used to live in its own repository; its history was merged into this one.
 
 ## What these skills are not
 

@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-12
+
+### Added
+
+- `paddle-webhooks`: fulfilment of one-time purchases from Paddle Billing into Supabase. Raw-body signature verification, `event_id` ledger, licence constraint on (transaction, product), adjustment state machine by action and status with an `occurred_at` guard, `references/EVENTS.md` quoting Paddle's delivery, retry and adjustment documentation, `references/SCHEMA.md` with the tables and handler, and a verification built on the simulator, the ledger and a sandbox refund.
+- `revenuecat-supabase-entitlements`: RevenueCat to Supabase entitlement sync for RLS gating. Edge Function authenticated by the shared header, event id ledger, and the vendor-recommended fetch of `GET /v1/subscribers` as the source of truth instead of the event type; `environment` column to keep sandbox out of production; paywall state table; drift query.
+- `agent-readable-site`: generated `llms.txt`, markdown mirror with literal-token `Accept` negotiation, Content-Signal, `Link` headers, format-matching 404s, optional MCP server card; `references/SURFACES.md` with sources for each surface including the draft status of SEP-1649; `references/NEXTJS.md`; `scripts/verify-agent-surface.sh`.
+
+### Changed
+
+- Manifests and the `tanfust-skills` router describe and route to all six procedure skills.
+- `scripts/validate.py` ignores links inside inline code spans.
+
 ## [0.2.0] - 2026-09-12
 
 ### Added
@@ -23,6 +36,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - `scripts/validate.py` structural validator and a GitHub Actions workflow that runs it on push and pull request.
 - `skills-framework.md`, the admission standard, plus `CONTRIBUTING.md` and `SECURITY.md`.
 
-[Unreleased]: https://github.com/tanfust/skills/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/tanfust/skills/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tanfust/skills/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tanfust/skills/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tanfust/skills/releases/tag/v0.1.0

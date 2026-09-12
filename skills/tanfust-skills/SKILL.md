@@ -1,6 +1,6 @@
 ---
 name: tanfust-skills
-description: Index and router for the Tanfust skills pack, production procedures for Supabase multi-tenancy and RLS, Supabase auth email templates, and Paddle domain verification. Use this whenever the work involves Supabase, Postgres row level security, organizations or tenants, memberships and invites, org_id or tenant_id columns, Supabase Auth emails, confirmation or magic link or recovery emails, config.toml email settings, Paddle website approval or domain review, refund policy or terms pages for a site selling through Paddle, so the specific skill gets loaded instead of guessing from first principles. Load it even when the request sounds small, because the failures in this territory are silent or cost a week.
+description: Index and router for the Tanfust skills pack, production procedures for Supabase multi-tenancy and RLS, Supabase auth emails, Paddle domain verification and webhooks, RevenueCat entitlements in Supabase, and agent-readable websites. Use this whenever the work involves Supabase, Postgres row level security, organizations or tenants, memberships and invites, Supabase Auth emails, config.toml, Paddle website approval or refund policy pages, Paddle webhooks or licences, RevenueCat entitlements or paywalls, llms.txt, markdown for agents, Content-Signal or an MCP server on a site, so the specific skill gets loaded instead of guessing from first principles. Load it even when the request sounds small, because the failures in this territory are silent or cost a week.
 ---
 
 # Tanfust skills
@@ -14,10 +14,11 @@ Procedures extracted from production work, not summaries of documentation. Each 
 | Organizations, teams, workspaces, tenants, memberships, invites, roles, `org_id`, RLS policies, security definer helpers, tenant isolation audits | `supabase-multi-tenant-rls` |
 | Supabase Auth email templates, confirmation and magic link and recovery emails, React Email, `config.toml` email config, SMTP setup, emails landing in spam | `supabase-auth-emails` |
 | Paddle website approval or domain verification, a domain review rejection, refund policy, terms and conditions or privacy policy for a site that sells through Paddle, Merchant of Record wording, paddle.net | `paddle-domain-verification` |
+| Paddle webhooks, notification destinations, `transaction.completed`, `adjustment.*`, `Paddle-Signature`, licences and download tokens, refunds or chargebacks not revoking access, the Paddle simulator | `paddle-webhooks` |
+| RevenueCat webhooks, `entitlements` table, `app_user_id`, paywall or subscription states, premium rows gated by RLS, `INITIAL_PURCHASE`, `EXPIRATION`, `BILLING_ISSUE`, `TRANSFER` | `revenuecat-supabase-entitlements` |
+| `llms.txt`, markdown mirror or `Accept: text/markdown`, Content-Signal in `robots.txt`, `Link` headers, agent-friendly 404s, MCP server card on a marketing site, isitagentready.com or is-agentic.com | `agent-readable-site` |
 
-Not yet in the pack, so do not try to load them: `paddle-webhooks`, `revenuecat-supabase-entitlements`, `agent-readable-site`. Paddle checkout code, webhooks and fulfilment are outside `paddle-domain-verification`. Until they ship, work from the vendor docs and the shared conventions below.
-
-If more than one applies, load them all. They are written to compose: the RLS skill defines the tenant boundary, and the auth email skill sits on the same `supabase/config.toml`.
+If more than one applies, load them all. They are written to compose: the RLS skill defines the tenant boundary, `paddle-webhooks` and `revenuecat-supabase-entitlements` write licences and entitlements inside it, and `supabase-auth-emails` sits on the same `supabase/config.toml`.
 
 ## Shared conventions
 

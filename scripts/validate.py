@@ -328,7 +328,7 @@ def check_links(root: Path, md_files):
                 continue
             if in_fence:
                 continue
-            for m in LINK.finditer(ln):
+            for m in LINK.finditer(re.sub(r"`[^`]*`", "", ln)):   # ignore inline code spans
                 target = m.group(1)
                 if re.match(r"^[a-z][a-z0-9+.-]*:", target):  # http:, mailto:, etc.
                     continue
