@@ -2,7 +2,7 @@
     "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
     "name": "tanfust-skills",
     "version": "0.1.0",
-    "description": "Production procedures for Supabase multi-tenancy and RLS, auth emails, Paddle webhooks and digital-product fulfilment, RevenueCat entitlement sync, and agent-readable websites.",
+    "description": "Production procedures for Supabase multi-tenancy and RLS and Supabase auth emails, extracted from shipped work. Each skill ends in a verification step.",
     "author": {
         "name": "Wassim Benromdhane",
         "url": "https://tanfust.com"
@@ -14,8 +14,10 @@
         "postgres",
         "rls",
         "multi-tenancy",
-        "paddle",
-        "revenuecat",
-        "mcp"
+        "supabase-auth",
+        "react-email",
+        "transactional-email",
+        "claude-code",
+        "agent-skills"
     ]
 }

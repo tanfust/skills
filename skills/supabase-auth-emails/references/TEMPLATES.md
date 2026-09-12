@@ -5,43 +5,42 @@
 1. [Auth Templates (Action Required)](#auth-templates)
 2. [Notification Templates (Informational)](#notification-templates)
 3. [Complete Go Template Variables](#complete-go-template-variables)
-4. [PKCE Flow (Server-Side Auth)](#pkce-flow)
+4. [token_hash flow for server-side auth](#token_hash-flow-for-server-side-auth)
 
----
 
 ## Auth Templates
 
 These templates contain a CTA (button or link) that the user must act on. Configured via `[auth.email.template.<type>]` in config.toml.
 
-### 1. confirmation — Confirm Sign Up
+### 1. confirmation (Confirm Sign Up)
 
 - **Purpose**: Sent after a user signs up to verify their email
 - **CTA**: Button linking to `{{ .ConfirmationURL }}`
 - **Variables**: `{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .SiteURL }}`, `{{ .TokenHash }}`, `{{ .RedirectTo }}`
 - **Subject example**: "Confirm your email"
 
-### 2. invite — Invite User
+### 2. invite (Invite User)
 
 - **Purpose**: Sent when an admin invites a new user
 - **CTA**: Button linking to `{{ .ConfirmationURL }}`
 - **Variables**: `{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .SiteURL }}`, `{{ .TokenHash }}`, `{{ .RedirectTo }}`
 - **Subject example**: "You've been invited"
 
-### 3. magic_link — Magic Link
+### 3. magic_link (Magic Link)
 
 - **Purpose**: Passwordless sign-in link
 - **CTA**: Button linking to `{{ .ConfirmationURL }}`
 - **Variables**: `{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .SiteURL }}`, `{{ .TokenHash }}`, `{{ .RedirectTo }}`
 - **Subject example**: "Your sign-in link"
 
-### 4. email_change — Change Email Address
+### 4. email_change (Change Email Address)
 
 - **Purpose**: Verify new email address after changing it
 - **CTA**: Button linking to `{{ .ConfirmationURL }}`
 - **Variables**: `{{ .ConfirmationURL }}`, `{{ .Email }}`, `{{ .NewEmail }}`, `{{ .SiteURL }}`, `{{ .TokenHash }}`, `{{ .RedirectTo }}`
 - **Subject example**: "Confirm email change"
 
-### 5. recovery — Reset Password
+### 5. recovery (Reset Password)
 
 - **Purpose**: Password reset link
 - **CTA**: Button linking to `{{ .ConfirmationURL }}`
@@ -50,16 +49,17 @@ These templates contain a CTA (button or link) that the user must act on. Config
 
 ### Reauthentication (not configurable via config.toml)
 
-Supabase sends a reauthentication OTP email internally when a user attempts a sensitive action. There is no `[auth.email.template.reauthentication]` key in config.toml — this email cannot be customized through the template system. You can still create a React Email component for it for preview/documentation purposes.
+Supabase sends a reauthentication OTP email internally when a user attempts a sensitive action. There is no `[auth.email.template.reauthentication]` key in config.toml, this email cannot be customized through the template system. You can still create a React Email component for it for preview/documentation purposes.
 
-- **CTA**: Displays OTP code `{{ .Token }}` — **no `{{ .ConfirmationURL }}` available**
+- **CTA**: Displays OTP code `{{ .Token }}`, no `{{ .ConfirmationURL }}` available
 - **Variables**: `{{ .Token }}`, `{{ .SiteURL }}`, `{{ .Email }}`, `{{ .Data }}`
 
----
 
 ## Notification Templates
 
-These are informational security alerts — no CTA needed. Configured via `[auth.email.notification.<type>]` in config.toml. All require `enabled = true`.
+Informational security alerts with no action link. Configured via `[auth.email.notification.<type>]` in config.toml, each with `enabled = true`, `subject` and `content_path` using the same `./supabase/templates/` convention as the action templates.
+
+Reference only. These have not been through the SKILL.md procedure in production, so the variables below come from the Supabase CLI configuration reference rather than from a verified send. Run the full verification section against any of them before trusting it.
 
 ### 6. password_changed
 
@@ -96,7 +96,6 @@ These are informational security alerts — no CTA needed. Configured via `[auth
 - **Variables**: `{{ .Email }}`, `{{ .FactorType }}`, `{{ .Data }}`
 - **Subject example**: "An MFA method has been removed"
 
----
 
 ## Complete Go Template Variables
 
@@ -118,35 +117,33 @@ All variables available in Supabase email templates:
 | `{{ .FactorType }}` | String | MFA factor type (e.g., "totp") | mfa_factor_enrolled, mfa_factor_unenrolled notifications |
 | `{{ .Data }}` | Object | Custom user metadata | All templates |
 
----
 
-## PKCE Flow
+## token_hash flow for server-side auth
 
-For server-side auth frameworks (Next.js App Router, SvelteKit, Remix), you may need to use PKCE-compatible URLs instead of `{{ .ConfirmationURL }}`. Replace the button href with a constructed URL using `{{ .TokenHash }}`:
+With `@supabase/ssr` (Next.js App Router, SvelteKit, Remix) do not use `{{ .ConfirmationURL }}`; see step 1 of SKILL.md for why it breaks when the link is opened in a browser other than the one that requested it. Build the link from `{{ .TokenHash }}` and verify it in a server route:
 
 ```
-{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=<type>&redirect_to={{ .RedirectTo }}
+{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=<type>&next={{ .RedirectTo }}
 ```
 
-The `type` parameter changes per template:
+`type` is the `EmailOtpType` your route passes to `supabase.auth.verifyOtp({ type, token_hash })`:
 
-| Template | Type Value |
+| Template | `type` |
 | --- | --- |
-| confirmation | `email` |
-| invite | `invite` |
-| magic_link | `magiclink` |
-| email_change | `email_change` |
+| confirmation | `email` (`signup` also accepted) |
+| magic_link | `email` (`magiclink` also accepted) |
 | recovery | `recovery` |
+| invite | `invite` |
+| email_change | `email_change` |
 
-**Example — PKCE confirmation button:**
+`next={{ .RedirectTo }}` carries the `emailRedirectTo` the client passed to `signInWithOtp` or `signUp`. The route must check that `next` is same-origin before redirecting to it.
+
+Example button in a template. The URL is assembled in the build script and arrives as the `confirmationUrl` prop; the component does not know which flow it is in:
 
 ```tsx
-<Button
-  href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&redirect_to={{ .RedirectTo }}"
-  className="box-border bg-gray-900 text-white px-6 py-3 text-sm font-medium no-underline"
->
-  Confirm Email
+<Button href={confirmationUrl} className="box-border bg-gray-900 text-white px-6 py-3 text-sm font-medium no-underline">
+  Confirm email
 </Button>
 ```
 
-Use the PKCE approach when your app handles the token exchange server-side (e.g., Next.js `/auth/confirm` route that calls `supabase.auth.verifyOtp()`). Use `{{ .ConfirmationURL }}` when Supabase handles the redirect directly.
+Use `{{ .ConfirmationURL }}` only when Supabase handles the redirect directly (implicit flow, no server-side session exchange).

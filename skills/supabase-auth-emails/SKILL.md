@@ -1,475 +1,190 @@
 ---
 name: supabase-auth-emails
-description: Use when customizing Supabase Auth emails with React Email components. Covers all Supabase Auth email types — 5 auth action templates (confirmation, invite, magic link, recovery, email change) and 7 notification templates (password changed, email changed, phone changed, identity linked/unlinked, MFA enrolled/unenrolled), the shared layout wrapper, Tailwind styling for email, the build-to-HTML pipeline with Go template variables, and Supabase config.toml integration. Use this skill whenever the user mentions Supabase auth emails, custom email templates for Supabase, password reset emails, magic link emails, sign-up confirmation emails, MFA notification emails, or any work involving rendering React Email to static HTML for Supabase's template system. Also applies when adding new Supabase auth email types or connecting React Email output to Supabase local dev.
+description: Replace Supabase Auth's default emails (confirmation, magic link, recovery, invite, email change) with branded React Email templates, wire them through supabase/config.toml, push them to the hosted project with supabase config push, and prove they render and deliver. Use this whenever the work touches Supabase auth emails or templates, [auth.email.template.*] or content_path in config.toml, {{ .ConfirmationURL }} or {{ .TokenHash }}, React Email rendered to static HTML for Supabase, custom SMTP via [auth.email.smtp] or Resend, Mailpit or Inbucket on localhost:54324, magic links that fail on another device, "Email link is invalid or has expired", "both auth code and code verifier should be non-empty", or auth emails that never arrive, land in spam, or still look like the Supabase default in production. Reach for it even for "just restyle the confirmation email", because the failures here are silent and reach customers. Not for product emails sent from application code, and not for the auth routes themselves.
 license: MIT
-metadata:
-  author: Wassim
-  version: "1.2.0"
 ---
 
-# Supabase Auth Email Templates with React Email
+# Supabase Auth emails with React Email
 
-Customize all Supabase Auth emails using React Email components, rendered to static HTML for Supabase's Go-based template system. This skill works alongside the `react-email` skill — use that skill for general React Email component usage, and this one specifically for the Supabase Auth integration layer.
+Two things go wrong with auth emails, and neither throws. The template looks right in the local mail catcher and production keeps sending the Supabase default, because `config.toml` is local configuration and nobody pushed it. Or the email arrives, the button works on the laptop that requested it, and fails for every customer who opens it on their phone, because the link depends on a cookie that only exists in the first browser. So the work is not finished when the template renders. It is finished when a link from a real send, opened in a browser that did not request it, produces a signed-in session, locally and on the hosted project.
 
-Read `references/TEMPLATES.md` for the full per-template variable reference and complete Go template variable listing.
+This skill covers the five action emails Supabase lets you template: `confirmation`, `magic_link`, `recovery`, `invite`, `email_change`. React Email is the authoring tool; Supabase only ever sees static HTML with Go template variables in it.
 
-## Theme & Branding Discovery
+## Order of work
 
-**Before generating any email template**, read the user's project to extract their existing theme and branding. Emails must visually match the app — never use generic hardcoded colors.
+1. Decide the link flow before writing any template
+2. Set up custom SMTP, because the default sender does not reach customers
+3. Write the templates against a shared layout
+4. Build to static HTML with the Go variables passed through as props
+5. Wire `config.toml` and restart the local stack
+6. Push to the hosted project
+7. Verify: build, send, open on another device, check production
 
-### 1. Read CSS / theme files
+## 1. Decide the link flow
 
-Search for `globals.css`, `global.css`, `tailwind.config.ts`, `tailwind.config.js`, or any theme token files. Extract:
+`{{ .ConfirmationURL }}` points at Supabase's `/auth/v1/verify` endpoint, which verifies the token and redirects to your site. With the implicit flow that is all you need. With server-side auth (`@supabase/ssr`, Next.js App Router, SvelteKit, Remix) the client starts a PKCE exchange and stores a code verifier in a cookie in the browser that requested the email. If the user opens the link anywhere else, the exchange fails with `both auth code and code verifier should be non-empty`. That is most users: they sign up on a laptop and tap the link on their phone.
 
-- **CSS custom properties**: `--primary`, `--background`, `--foreground`, `--muted`, `--muted-foreground`, `--border`, `--accent`, and font families
-- **Tailwind config**: `theme.extend.colors`, `theme.extend.fontFamily`, and any custom color palette
-
-### 2. Read site config files
-
-Search for `config/site.ts`, `lib/config.ts`, `src/config.ts`, or similar. Extract:
-
-- App name, tagline, support email, base URL
-- Logo URL if available
-- Fall back to `package.json` `name` field if no site config exists
-
-### 3. Map discovered values to email styles
-
-| Theme Token | Maps To |
-| --- | --- |
-| `primary` | CTA button background, link color |
-| `background` / `foreground` | Email body background, heading & body text color |
-| `muted` / `muted-foreground` | Footer text, disclaimer text |
-| `border` | HR dividers |
-| Font family | `font-sans` override or inline `fontFamily` style |
-| App name / support email | Layout header, footer |
-
-### 4. Fallback
-
-If no theme files exist in the project, use the generic defaults shown in the examples below.
-
-## Prerequisites
-
-React Email must be installed in the project. If it isn't, follow the manual setup:
-
-```bash
-# Install React Email and components
-npm install @react-email/components
-npm install react-email --save-dev
-
-# Add preview script to package.json
-# "email:dev": "email dev --dir emails --port 3000"
-```
-
-See the `react-email` skill or <https://react.email/docs/getting-started/manual-setup> for full setup instructions, tsconfig requirements, and component documentation.
-
-You also need a Supabase project initialized (`supabase init`) with a `supabase/config.toml` file.
-
-## How It Works
-
-Supabase Auth sends emails for auth actions (sign-up confirmation, password reset, etc.) and security notifications (password changed, MFA enrolled, etc.). By default these use plain built-in templates. To customize them:
-
-1. Write React Email components in `emails/` with typed props
-2. A build script renders each component to static HTML, injecting Supabase's Go template variables (`{{ .ConfirmationURL }}`, `{{ .Email }}`, etc.) as prop values
-3. The HTML files land in `supabase/templates/`
-4. `supabase/config.toml` points each auth email type to its HTML file
-
-This gives you the React Email dev preview for design iteration, while Supabase gets the static HTML it needs.
-
-## Supabase Auth Email Types
-
-Supabase supports 12 customizable email types via config.toml, across two categories:
-
-### Auth Action Templates (5) — configured via `[auth.email.template.<type>]`
-
-These emails contain a link the user must click to complete an action.
-
-| Supabase Type | Purpose | Key Variable |
-| --- | --- | --- |
-| `confirmation` | Verify email after sign-up | `{{ .ConfirmationURL }}` |
-| `invite` | Invite user to create account | `{{ .ConfirmationURL }}` |
-| `magic_link` | Passwordless sign-in link | `{{ .ConfirmationURL }}` |
-| `email_change` | Verify new email after change | `{{ .ConfirmationURL }}` |
-| `recovery` | Password reset link | `{{ .ConfirmationURL }}` |
-
-> **Note on reauthentication**: Supabase sends a reauthentication OTP email internally, but there is no `[auth.email.template.reauthentication]` config key. You can still create a React Email component for it (useful for preview/documentation), but it cannot be customized via config.toml.
-
-### Notification Templates (7) — configured via `[auth.email.notification.<type>]`
-
-These are informational security alerts — no action link needed.
-
-| Supabase Type | Purpose |
-| --- | --- |
-| `password_changed` | Password was changed |
-| `email_changed` | Email address was changed |
-| `phone_changed` | Phone number was changed |
-| `identity_linked` | New identity provider linked |
-| `identity_unlinked` | Identity provider removed |
-| `mfa_factor_enrolled` | MFA method added |
-| `mfa_factor_unenrolled` | MFA method removed |
-
-## Recommended File Structure
+The fix is to build the link yourself from `{{ .TokenHash }}` and verify it in a server route that does not need the cookie:
 
 ```
-emails/
-  _components/
-    email-layout.tsx              # Shared wrapper — all templates use this
-  confirm-sign-up.tsx             # confirmation
-  invite-user.tsx                 # invite
-  magic-link.tsx                  # magic_link
-  change-email.tsx                # email_change
-  reset-password.tsx              # recovery
-  reauthentication.tsx            # (React Email preview only — no config.toml key)
-  notify-password-changed.tsx     # password_changed
-  notify-email-changed.tsx        # email_changed
-  notify-phone-changed.tsx        # phone_changed
-  notify-identity-linked.tsx      # identity_linked
-  notify-identity-unlinked.tsx    # identity_unlinked
-  notify-mfa-added.tsx            # mfa_factor_enrolled
-  notify-mfa-removed.tsx          # mfa_factor_unenrolled
-
-scripts/
-  build-email-templates.ts        # Renders React Email → static HTML
-
-supabase/
-  templates/                      # Generated HTML — do NOT edit directly
-  config.toml                     # Template path configuration
+{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}
 ```
 
-The `_components/` prefix is a React Email convention — the preview server ignores directories starting with `_`, so shared components don't appear as standalone previews.
+- `type` is what your route passes to `supabase.auth.verifyOtp({ type, token_hash })`. `email` covers confirmation and magic link. Use `recovery`, `invite` and `email_change` for the others.
+- `next={{ .RedirectTo }}`: Supabase substitutes `RedirectTo` with the `emailRedirectTo` the client passed to `signInWithOtp` or `signUp`, so the user's intended destination survives the round trip. Your route must validate `next` as same-origin before redirecting, or you have shipped an open redirect.
+- `{{ .SiteURL }}` is the project's Site URL, not the request origin. Locally that is whatever `site_url` says in `config.toml`; in production it is the value in Auth settings. If the two disagree with where the app actually runs, every link points at the wrong host.
 
-## Shared Layout Component
+Decide this per template and write it down in the build script, which is the only place the URL is assembled. Mixing flows across templates is how one email in five breaks.
 
-Create a wrapper that provides consistent structure across all emails. Every template should use it.
+## 2. Set up custom SMTP
 
-**Always read the user's project first.** Import the app name, URL, and support email from the project's site config. For colors, read `globals.css` and `tailwind.config` to extract actual theme colors. See [Theme & Branding Discovery](#theme--branding-discovery).
+Supabase's built-in sender is for development. On hosted projects it only delivers to addresses belonging to project team members and is tightly rate limited. A new customer signing up gets nothing, the API returns success, and the first report is a support ticket days later. Configure `[auth.email.smtp]` before shipping any template, and use a subdomain for the sender so a deliverability problem cannot damage the root domain's reputation:
 
-```tsx
-import {
-  Body, Container, Head, Heading, Hr, Html, Link,
-  Preview, Section, Tailwind, Text, pixelBasedPreset,
-} from "@react-email/components";
-// Import from the project's site config — adapt the path to the actual project
-// import { siteConfig } from "@/config/site";
-
-interface EmailLayoutProps {
-  previewText: string;
-  children: React.ReactNode;
-}
-
-export default function EmailLayout({ previewText, children }: EmailLayoutProps) {
-  return (
-    <Html lang="en">
-      <Tailwind config={{ presets: [pixelBasedPreset] }}>
-        <Head />
-        <Preview>{previewText}</Preview>
-        {/* bg-gray-100 → replace with project's background color */}
-        <Body className="bg-gray-100 font-sans py-10">
-          <Container className="mx-auto max-w-[560px] bg-white p-10">
-            {/* Replace with siteConfig.name or project's app name */}
-            {/* text-gray-900 → replace with project's foreground color */}
-            <Heading className="text-2xl font-bold text-gray-900 text-center m-0">
-              Your App Name
-            </Heading>
-            {/* border-gray-200 → replace with project's border color */}
-            <Hr className="border-solid border-gray-200 my-6" />
-
-            {children}
-
-            <Hr className="border-solid border-gray-200 my-6" />
-            {/* Footer — replace with siteConfig values */}
-            {/* text-gray-500 → replace with project's muted-foreground color */}
-            <Section className="text-center">
-              <Text className="text-xs text-gray-500 m-0 mb-1">
-                Your App Name — Your tagline here.
-              </Text>
-              <Text className="text-xs text-gray-500 m-0">
-                Questions?{" "}
-                <Link href="mailto:support@yourapp.com" className="text-gray-500 underline">
-                  support@yourapp.com
-                </Link>
-              </Text>
-            </Section>
-          </Container>
-        </Body>
-      </Tailwind>
-    </Html>
-  );
-}
+```toml
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "env(RESEND_FROM_EMAIL)"
 ```
 
-When no centralized site config exists, make branding configurable via props:
+`env(...)` reads from the CLI's environment, so the key never lands in the repo. On the hosted side the same settings live under Auth, SMTP, and are also covered by `supabase config push`. Set SPF and DKIM on the sending subdomain at the provider before the first real send; without them the first thing your branded template does is land in spam.
 
-```tsx
-interface EmailLayoutProps {
-  previewText: string;
-  children: React.ReactNode;
-  projectName?: string;
-  logoUrl?: string;
-  brandColor?: string;
-  supportEmail?: string;
-}
-```
+## 3. Write the templates
 
-## Template Patterns
+Author under `emails/` with a shared layout in `emails/_components/`. The underscore prefix keeps shared parts out of the React Email preview list. Typed props, one component per Supabase type, `PreviewProps` on each so `email dev` renders something useful.
 
-### Auth Action Email Pattern
+Email clients dictate the styling rules, and violating them does not error, it just renders wrong somewhere you did not test: no flexbox or grid, no `rem`, no media queries, no SVG or WebP, `box-border` or an explicit `boxSizing` on buttons so Outlook does not overflow the padding, `border-solid` or an explicit `borderStyle` on every `Hr` because clients do not inherit border style and an unstyled rule renders as nothing. Always include the raw URL as text under the button, because some clients strip button markup.
 
-Auth action emails include a CTA button linking to a Supabase confirmation URL, plus a raw URL fallback for email clients that strip buttons.
+Read the project's existing theme before choosing colours: `globals.css` custom properties, `tailwind.config.*`, a `config/site.ts` with the app name and support address. A template that matches the app is the whole point of doing this instead of editing HTML in the dashboard.
 
-Replace the color classes below with the project's actual theme colors (see [Theme & Branding Discovery](#theme--branding-discovery)).
+Full layout and template components are in `references/COMPONENTS.md`. Read it when writing a template from scratch; the body here assumes the shape.
 
-```tsx
-import { Button, Heading, Section, Text } from "@react-email/components";
-import EmailLayout from "./_components/email-layout";
+## 4. Build to static HTML
 
-interface ConfirmSignUpProps {
-  confirmationUrl: string;
-  email: string;
-}
-
-export default function ConfirmSignUp({ confirmationUrl, email }: ConfirmSignUpProps) {
-  return (
-    <EmailLayout previewText="Confirm your account">
-      {/* text-gray-900 → foreground color */}
-      <Heading as="h2" className="text-xl font-bold text-gray-900 m-0 mb-4">
-        Confirm your email
-      </Heading>
-      {/* text-gray-700 → muted-foreground color */}
-      <Text className="text-sm leading-6 text-gray-700 my-4">
-        Please confirm your email address ({email}) by clicking the button below.
-      </Text>
-      <Section className="text-center my-8">
-        {/* bg-gray-900 → primary color */}
-        <Button
-          href={confirmationUrl}
-          className="box-border bg-gray-900 text-white px-6 py-3 text-sm font-medium no-underline"
-        >
-          Confirm Email
-        </Button>
-      </Section>
-      {/* text-gray-500 → muted color */}
-      <Text className="text-xs text-gray-500 my-4">
-        If you didn't create an account, you can safely ignore this email.
-      </Text>
-      <Text className="text-xs text-gray-400 my-2 break-all">
-        {confirmationUrl}
-      </Text>
-    </EmailLayout>
-  );
-}
-
-ConfirmSignUp.PreviewProps = {
-  confirmationUrl: "https://yourapp.com/auth/confirm?token=abc123",
-  email: "user@example.com",
-} satisfies ConfirmSignUpProps;
-```
-
-### Notification Email Pattern
-
-Notification emails are simpler — no CTA button, just an explanation and a security callout linking to the password reset page.
-
-Replace the color classes and URL below with the project's actual theme colors and site URL (see [Theme & Branding Discovery](#theme--branding-discovery)).
-
-```tsx
-import { Heading, Link, Text } from "@react-email/components";
-import EmailLayout from "./_components/email-layout";
-
-interface NotifyPasswordChangedProps {
-  email: string;
-}
-
-export default function NotifyPasswordChanged({ email }: NotifyPasswordChangedProps) {
-  return (
-    <EmailLayout previewText="Password change notification">
-      {/* text-gray-900 → foreground color */}
-      <Heading as="h2" className="text-xl font-bold text-gray-900 m-0 mb-4">
-        Your password was changed
-      </Heading>
-      {/* text-gray-700 → muted-foreground color */}
-      <Text className="text-sm leading-6 text-gray-700 my-4">
-        The password for your account ({email}) was recently changed.
-      </Text>
-      <Text className="text-sm leading-6 text-gray-700 my-4">
-        If you made this change, no further action is needed.
-      </Text>
-      <Text className="text-sm leading-6 text-gray-700 my-4">
-        If you did not make this change, secure your account immediately by{" "}
-        {/* Use the project's site URL — e.g., from siteConfig.url */}
-        <Link
-          href="https://yourapp.com/auth/forgot-password"
-          className="text-gray-900 underline font-medium"
-        >
-          resetting your password
-        </Link>.
-      </Text>
-    </EmailLayout>
-  );
-}
-
-NotifyPasswordChanged.PreviewProps = {
-  email: "user@example.com",
-} satisfies NotifyPasswordChangedProps;
-```
-
-## Email Styling Rules
-
-These rules come from email client limitations — violating them causes rendering bugs.
-
-- **Use Tailwind** via `<Tailwind config={{ presets: [pixelBasedPreset] }}>` — the `pixelBasedPreset` converts all sizing to `px` because email clients don't support `rem`
-- **No flexbox or grid** — use block flow, `text-center`, `mx-auto` for layout
-- **Button**: always include `box-border` — prevents padding from overflowing the button width in Outlook
-- **Hr**: always include `border-solid` — email clients don't inherit border type, so omitting it renders no visible line
-- **No SVG or WEBP images** — these don't render in many email clients
-- **No CSS media queries** (`sm:`, `md:`, `dark:`) — not supported in email
-
-For full component reference and styling details, use the `react-email` skill.
-
-## Supabase Go Template Variables
-
-When the build script renders templates, it passes Go template variable strings as literal prop values:
-
-| React Prop | Go Template Variable | Description |
-| --- | --- | --- |
-| `confirmationUrl` | `{{ .ConfirmationURL }}` | Auth action link (confirm, invite, magic link, recovery, etc.) |
-| `token` | `{{ .Token }}` | OTP code (used in reauthentication) |
-| `email` | `{{ .Email }}` | User's email address |
-| — | `{{ .SiteURL }}` | Site URL from Supabase config (useful in footers) |
-
-**Always use `{{ .ConfirmationURL }}`** for auth action template links. Supabase generates the correct URL regardless of your auth flow (including PKCE). Do not construct URLs manually using token hashes.
-
-See `references/TEMPLATES.md` for the complete variable list per template, including notification-specific variables (`{{ .OldEmail }}`, `{{ .Provider }}`, `{{ .FactorType }}`, etc.).
-
-## Build Script
-
-The build script bridges React Email components and Supabase's static HTML templates. It imports each component, calls `render()` with Go template variable strings as props, and writes the output.
+Supabase needs files on disk. A build script renders each component with the Go template strings passed in as ordinary prop values, so `{{ .ConfirmationURL }}` survives into the HTML as literal text:
 
 ```typescript
-import { render } from "@react-email/components";
-import { writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
-
-// Import all email components
-import ConfirmSignUp from "../emails/confirm-sign-up";
-// ... other imports
-
-const outDir = join(import.meta.dirname, "..", "supabase", "templates");
-mkdirSync(outDir, { recursive: true });
+// scripts/build-email-templates.ts
+import { render } from "react-email";          // "@react-email/components" on v3 and earlier
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import MagicLinkEmail from "../emails/magic-link";
+import ConfirmSignUpEmail from "../emails/confirm-sign-up";
 
 const SB = {
   confirmationUrl: "{{ .ConfirmationURL }}",
-  token: "{{ .Token }}",
   email: "{{ .Email }}",
+  newEmail: "{{ .NewEmail }}",
 };
 
 const templates = [
-  { name: "confirm-sign-up", element: ConfirmSignUp({ confirmationUrl: SB.confirmationUrl, email: SB.email }) },
-  // ... other templates with their respective Go template variables
+  { name: "magic-link", element: MagicLinkEmail({
+      confirmationUrl: "{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next={{ .RedirectTo }}",
+      email: SB.email }) },
+  { name: "confirm-sign-up", element: ConfirmSignUpEmail({ confirmationUrl: SB.confirmationUrl, email: SB.email }) },
+  // recovery, invite, email_change follow the same shape
 ];
 
-async function build() {
-  for (const { name, element } of templates) {
-    const html = await render(element);
-    writeFileSync(join(outDir, `${name}.html`), html, "utf-8");
-    console.log(`  ${name}.html`);
-  }
-}
-
-build().catch((err) => { console.error("Build failed:", err); process.exit(1); });
-```
-
-Add a package.json script to run it:
-
-```json
-{
-  "scripts": {
-    "email:build-templates": "npx tsx scripts/build-email-templates.ts"
-  }
+const outDir = join(import.meta.dirname, "..", "supabase", "templates");
+mkdirSync(outDir, { recursive: true });
+for (const { name, element } of templates) {
+  writeFileSync(join(outDir, `${name}.html`), await render(element), "utf-8");
 }
 ```
 
-## Supabase config.toml Integration
+Add `"email:build-templates": "tsx scripts/build-email-templates.ts"` to `package.json` and commit the generated HTML. The CLI reads the files, not the components, so an uncommitted `supabase/templates/` means CI and teammates run with the defaults.
 
-Wire each template in `supabase/config.toml`. Only these keys are supported by the Supabase CLI:
+Do not put the Go variables in `PreviewProps`. Those are for the preview server and should hold realistic values so a designer can judge the layout.
 
-### Auth action templates — `[auth.email.template.<type>]`
+## 5. Wire config.toml and restart
 
 ```toml
+[auth.email.template.magic_link]
+subject = "Your sign-in link"
+content_path = "./supabase/templates/magic-link.html"
+
 [auth.email.template.confirmation]
 subject = "Confirm your account"
 content_path = "./supabase/templates/confirm-sign-up.html"
+
+[auth.email.template.recovery]
+subject = "Reset your password"
+content_path = "./supabase/templates/reset-password.html"
 
 [auth.email.template.invite]
 subject = "You have been invited"
 content_path = "./supabase/templates/invite-user.html"
 
-[auth.email.template.magic_link]
-subject = "Your sign-in link"
-content_path = "./supabase/templates/magic-link.html"
-
 [auth.email.template.email_change]
 subject = "Confirm your new email"
 content_path = "./supabase/templates/change-email.html"
-
-[auth.email.template.recovery]
-subject = "Reset your password"
-content_path = "./supabase/templates/reset-password.html"
 ```
 
-> There is no `[auth.email.template.reauthentication]` — Supabase handles that email internally.
+Paths resolve from the project root, where you run the CLI. There is no `reauthentication` key; that email cannot be templated through the CLI. The local stack reads `config.toml` at start, so after any change run `supabase stop && supabase start`. Editing the HTML alone changes nothing until the restart either, which is the most common reason a fix "did not work".
 
-### Notification templates — `[auth.email.notification.<type>]`
+Check `[auth.email]` while you are there: `enable_confirmations` decides whether the confirmation email is sent at all, and `max_frequency` is the minimum gap between two emails to the same address. A `max_frequency` of `1m` in production makes "resend the link" fail silently for a minute.
 
-> **Path difference**: Notification `content_path` values use `./templates/` (relative to the `supabase/` directory), while auth action templates use `./supabase/templates/` (relative to project root). This matches Supabase's own conventions.
+## 6. Push to the hosted project
 
-```toml
-[auth.email.notification.password_changed]
-enabled = true
-subject = "Your password was changed"
-content_path = "./templates/notify-password-changed.html"
+`config.toml` configures the local stack and nothing else. The hosted project keeps its own copy of every template and subject. After `supabase link`, push:
 
-[auth.email.notification.email_changed]
-enabled = true
-subject = "Your email was changed"
-content_path = "./templates/notify-email-changed.html"
-
-[auth.email.notification.phone_changed]
-enabled = true
-subject = "Your phone number was changed"
-content_path = "./templates/notify-phone-changed.html"
-
-[auth.email.notification.identity_linked]
-enabled = true
-subject = "New identity linked to your account"
-content_path = "./templates/notify-identity-linked.html"
-
-[auth.email.notification.identity_unlinked]
-enabled = true
-subject = "Identity unlinked from your account"
-content_path = "./templates/notify-identity-unlinked.html"
-
-[auth.email.notification.mfa_factor_enrolled]
-enabled = true
-subject = "MFA method added to your account"
-content_path = "./templates/notify-mfa-added.html"
-
-[auth.email.notification.mfa_factor_unenrolled]
-enabled = true
-subject = "MFA method removed from your account"
-content_path = "./templates/notify-mfa-removed.html"
+```bash
+supabase config push
 ```
 
-## Adding a New Template
+The CLI prints a diff of what will change on the remote, including the template bodies. Read it. Then confirm in the dashboard under Authentication, Emails, that each template shows your HTML. Do this on every template change, or add it to the deploy pipeline. A team that edits templates locally and forgets this step ships the default Supabase email to customers for months with no error anywhere.
 
-1. Create `emails/my-template.tsx` following the auth action or notification pattern
-2. Import it in `scripts/build-email-templates.ts` and add to the `templates` array with the correct Go template variable mapping
-3. Add the corresponding `[auth.email.template.*]` or `[auth.email.notification.*]` block in `supabase/config.toml` (only if the type is supported — check the Supabase CLI config docs)
-4. Run the build script to generate the HTML
-5. Preview with the React Email dev server
-6. Restart local Supabase for it to pick up the new template
+## Failure modes worth recognizing quickly
 
-## Verification
+| Symptom | Cause |
+| --- | --- |
+| Link works on the machine that requested it, fails elsewhere with `both auth code and code verifier should be non-empty` | Server-side auth using `{{ .ConfirmationURL }}`. Switch that template to the `token_hash` flow in step 1 |
+| `Email link is invalid or has expired` (`error_code=otp_expired`) on first click | The link was consumed before the user clicked it, usually by a corporate mail scanner that prefetches URLs. The token is single-use. Move verification behind a page with a button or a POST so a GET cannot consume it |
+| Email arrives locally, production sends the Supabase default | `config.toml` was never pushed. Step 6 |
+| Sign-up succeeds, no email arrives in production, team addresses do receive it | Built-in sender restricted to team members. Step 2 |
+| Email arrives with `{{ .ConfirmationURL }}` printed in it | Template loaded from a path with no such file, so Supabase fell back to raw text, or the build encoded the braces. Check the `content_path` and grep the HTML |
+| Button links to `localhost` in production | `site_url` in the hosted Auth settings is wrong, or the template hardcodes a host instead of `{{ .SiteURL }}` |
+| Template changes have no effect locally | Local stack not restarted after the edit |
+| `Hr` renders as nothing, button padding overflows in Outlook | Missing `border-solid` on `Hr`, missing `box-border` on `Button` |
+| Second magic link request returns a rate limit error | `max_frequency` in `[auth.email]`, or the hosted email rate limit |
 
-1. **Preview**: run the React Email dev server — all templates should appear and render
-2. **Build**: run the build script — HTML files generated in `supabase/templates/`
-3. **Local test**: restart local Supabase, trigger an auth flow (sign up, forgot password), check InBucket (typically at `localhost:54324`) for the custom-styled email
-4. **Variable check**: open a generated HTML file and verify `{{ .ConfirmationURL }}` and `{{ .Email }}` appear as literal text (not rendered as empty)
+## 7. Verify
+
+Four checks. The first two are mechanical, the third is the one that proves the thing works, the fourth is the one people skip.
+
+**Build and paths.** Run the build, then confirm every `content_path` in `config.toml` exists and every generated file still carries a link variable:
+
+```bash
+pnpm email:build-templates
+grep -oE 'content_path = "[^"]+"' supabase/config.toml | cut -d'"' -f2 | while read -r f; do [ -f "$f" ] || echo "MISSING $f"; done
+grep -L -e '{{ .ConfirmationURL }}' -e '{{ .TokenHash }}' supabase/templates/*.html
+grep -l -e '%7B%7B' -e '&#123;' supabase/templates/*.html
+```
+
+Pass: the three greps print nothing. Any filename printed is a finding.
+
+**Local send.** Restart the stack, trigger a real flow through the Auth API rather than the UI, and read the message back from Mailpit's API (the CLI's mail catcher on port 54324; older CLIs ship Inbucket at the same port with a different API, in which case open it in the browser instead):
+
+```bash
+supabase stop && supabase start
+eval "$(supabase status -o env)"
+curl -s -X POST "$API_URL/auth/v1/magiclink" -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
+  -d '{"email":"a@example.test"}'
+ID=$(curl -s http://127.0.0.1:54324/api/v1/messages | python3 -c 'import sys,json; print(json.load(sys.stdin)["messages"][0]["ID"])')
+curl -s "http://127.0.0.1:54324/api/v1/message/$ID" | python3 -c 'import sys,json; m=json.load(sys.stdin); print(m["Subject"]); print("{{" in m["HTML"], "token_hash=" in m["HTML"] or "/auth/v1/verify" in m["HTML"])'
+```
+
+Pass: the subject equals the one in `config.toml`, the first boolean is `False` (no unrendered Go syntax), the second is `True` (a real link). Repeat for `signup` and `recover` endpoints so all templates with a config entry have been sent at least once.
+
+**Cross-device open.** Copy the link out of the Mailpit message and open it in a private window, which has none of the requesting browser's cookies. Pass: the app lands signed in at the `next` destination. A redirect to your error page is a failure of step 1, whatever the local preview looked like.
+
+**Production.** After `supabase config push`, request a magic link against the hosted project from a non-team address you control, open it on a phone, and read the headers of the received message. Pass: signed-in session, `Authentication-Results` shows `spf=pass` and `dkim=pass`, and the dashboard's template page shows your HTML for all five types.
+
+Report as a table of `check / template / result / evidence`, one row per template per check, with the Mailpit message ID or the production message's `Message-ID` as evidence. If everything passes, say so and list the five subjects observed, so the next person can tell a verified run from a claim.
+
+## Where this stops
+
+This skill covers the templates, the build, the CLI configuration and delivery. It does not cover the `/auth/confirm` route beyond what the link needs from it, the sign-in UI, or product emails sent from application code through Resend or similar; those use the same layout components but are rendered at send time, not built to static files. Notification emails (`[auth.email.notification.*]`, password changed, MFA enrolled and so on) are listed in `references/TEMPLATES.md` for completeness but have not been through this procedure in production, so treat that section as reference, not as verified.

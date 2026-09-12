@@ -1,6 +1,6 @@
 ---
 name: supabase-multi-tenant-rls
-description: Design, implement and verify multi-tenant Row Level Security in Supabase Postgres - organizations, memberships, roles and invites - without recursive policies, privilege escalation, or silent cross-tenant leaks. Use this whenever the work touches organizations, teams, workspaces, tenants, members, invites, roles and permissions, RLS policies, security definer helper functions, or any table carrying an org_id or tenant_id. Use it for audits and debugging of existing policies too. Reach for it even when the request sounds like a trivial "just add a policy" task, because the failure mode here is silent: a wrong policy returns rows instead of an error.
+description: Design, implement and verify multi-tenant Row Level Security in Supabase Postgres - organizations, memberships, roles and invites - without recursive policies, privilege escalation, or silent cross-tenant leaks. Use this whenever the work touches organizations, teams, workspaces, tenants, members, invites, roles and permissions, RLS policies, security definer helper functions, or any table carrying an org_id or tenant_id. Use it for audits and debugging of existing policies too. Reach for it even when the request sounds like a trivial "just add a policy" task, because the failure mode here is silent, a wrong policy returns rows instead of an error.
 ---
 
 # Multi-tenant RLS on Supabase
@@ -174,22 +174,6 @@ See `references/POLICIES.md` for the per-table-type patterns: owner-scoped rows,
 - Acceptance is a second RPC that, in one transaction, checks expiry, checks `accepted_at is null`, inserts the membership, and stamps `accepted_at`. Doing this client-side in two calls leaves a window where the invite can be redeemed twice.
 - Decide explicitly whether the invite is bound to the email address it was sent to. If it is, compare against `auth.email()` inside the RPC. If it is not, say so in the product, because the link is then a bearer token.
 
-## 6. Verify
-
-This is the step that distinguishes a finished job from a plausible one.
-
-Run the static audit in `references/AUDIT.md`. It checks, in SQL: public tables with RLS disabled, security definer functions without a pinned `search_path`, functions still executable by `anon` or `public`, UPDATE policies missing `with check`, policies that apply to the `public` role, and views created without `security_invoker`.
-
-Then run the cross-tenant proof, also in `references/AUDIT.md`. Two organizations, two users, then impersonate each in a transaction and assert that every tenant table returns zero rows belonging to the other organization, and that an UPDATE attempting to move a row across the boundary is rejected. A fix without this test is not verified, it is assumed.
-
-Finally, run the platform's own checks, which catch things the queries above do not:
-
-```bash
-supabase db lint --level warning
-```
-
-and the security advisor in the dashboard or through the Supabase MCP server.
-
 ## Failure modes worth recognizing quickly
 
 | Symptom | Cause |
@@ -200,6 +184,26 @@ and the security advisor in the dashboard or through the Supabase MCP server.
 | A view returns rows the base table would deny | Views run as their owner unless created `with (security_invoker = on)` |
 | Rows appear under the wrong organization after an edit | UPDATE policy has `using` but no `with check` |
 | Works for a signed-in user, also works for the anon key | Policy has no `to authenticated`, or the table has RLS disabled entirely |
+
+## 6. Verify
+
+This is the step that distinguishes a finished job from a plausible one.
+
+Run the static audit in `references/AUDIT.md`. It checks, in SQL: public tables with RLS disabled, security definer functions without a pinned `search_path`, functions still executable by `anon` or `public`, UPDATE policies missing `with check`, policies that apply to the `public` role, and views created without `security_invoker`.
+
+Then run the cross-tenant proof, also in `references/AUDIT.md`. Two organizations, two users, then impersonate each in a transaction and assert that every tenant table returns zero rows belonging to the other organization, and that an UPDATE attempting to move a row across the boundary is rejected. A fix without this test is not verified, it is assumed.
+
+What counts as pass: every static audit query returns zero rows (or each remaining row is named and justified, as with a deliberate invite lookup RPC), and every `do` block in the cross-tenant proof completes without raising, in both directions.
+
+What to report: a table of `finding / table / severity / fix`, ordered by severity, leading with anything from audit queries 1, 3, 4, 5 or a failed assertion, because those are live exposure. If everything is clean, say so and list what was checked, so the result is auditable later instead of a claim that it looked fine.
+
+Finally, run the platform's own checks, which catch things the queries above do not:
+
+```bash
+supabase db lint --level warning
+```
+
+and the security advisor in the dashboard or through the Supabase MCP server.
 
 ## Where this stops
 
