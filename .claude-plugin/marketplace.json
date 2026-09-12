@@ -1,0 +1,23 @@
+{
+    "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+    "name": "tanfust",
+    "description": "Tanfust skills: production procedures for Supabase multi-tenancy, payments fulfilment, and agent-readable products.",
+    "owner": {
+        "name": "Wassim Benromdhane",
+        "url": "https://tanfust.com"
+    },
+    "plugins": [
+        {
+            "name": "tanfust-skills",
+            "source": "./",
+            "description": "Supabase RLS and multi-tenancy, auth emails, Paddle webhooks and fulfilment, RevenueCat entitlements, and agent-readable sites. Each skill is a procedure with a verification step, extracted from shipped work.",
+            "category": "development",
+            "author": {
+                "name": "Wassim Benromdhane",
+                "url": "https://tanfust.com"
+            },
+            "homepage": "https://github.com/tanfust/skills",
+            "license": "MIT"
+        }
+    ]
+}
