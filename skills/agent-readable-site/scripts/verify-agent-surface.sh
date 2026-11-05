@@ -8,6 +8,10 @@
 # Tune the lists below to the site. Anything not present on the site should be
 # removed from the list rather than left to fail; the point is a green run that
 # means something.
+#
+# The MCP check runs @modelcontextprotocol/inspector at the exact version in
+# INSPECTOR_VERSION through npx, which downloads it on first use. Set
+# MCP_ENDPOINT= to skip it.
 
 set -uo pipefail
 
@@ -17,6 +21,7 @@ HTML_PAGE="${HTML_PAGE:-/}"                 # a page that has a markdown twin
 API_404="${API_404:-/api/nope}"             # any path under /api that does not exist; set empty to skip
 MCP_CARD="${MCP_CARD:-/.well-known/mcp/server-card.json}"   # set empty to skip
 MCP_ENDPOINT="${MCP_ENDPOINT:-/api/mcp}"    # set empty to skip
+INSPECTOR_VERSION="${INSPECTOR_VERSION:-2.12.0}"   # exact version; bump deliberately, never "latest"
 
 pass=0; fail=0
 ok()  { printf '  ok    %s\n' "$1"; pass=$((pass+1)); }
@@ -87,7 +92,7 @@ if [ -n "$MCP_CARD" ]; then
   contains "server card names a transport endpoint" '"endpoint"' "$card"
   contains "server card names serverInfo" '"serverInfo"' "$card"
   if [ -n "$MCP_ENDPOINT" ] && command -v npx >/dev/null 2>&1; then
-    tools="$(npx -y @modelcontextprotocol/inspector --cli "$BASE$MCP_ENDPOINT" --transport http --method tools/list 2>/dev/null)"
+    tools="$(npx -y "@modelcontextprotocol/inspector@$INSPECTOR_VERSION" --cli "$BASE$MCP_ENDPOINT" --transport http --method tools/list 2>/dev/null)"
     contains "MCP endpoint answers tools/list" '"tools"' "$tools"
   fi
 fi

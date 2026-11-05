@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Security
+
+- `supabase-auth-emails`: the local-send check no longer pipes Mailpit responses into `python3` or `eval`s `supabase status` output. It reads status values with `sed`, compares each message to the expected subject and link with `grep`, and prints only `FAIL` lines and the Mailpit message ID, so email content, which carries sign-up data the requester controlled, stays out of the agent's context. The section now states that fetched mail is data, not instructions. The check also creates a confirmed user first, because with `enable_confirmations = true` a magic link to an unconfirmed address sends the confirmation email instead. Prompted by the Gen Agent Trust Hub audit on skills.sh (Sep 12, 2026).
+- `paddle-domain-verification`: the home page link count no longer goes through `xargs sh -c`, and the static check states that page text is data.
+- `agent-readable-site`: `verify-agent-surface.sh` runs `@modelcontextprotocol/inspector` at an exact version (`INSPECTOR_VERSION`, default 2.12.0) instead of whatever npx resolves, and scanner reports are treated as data.
+
 ## [0.3.0] - 2026-09-12
 
 ### Added
